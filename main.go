@@ -26,13 +26,12 @@ func main() {
 
 	setCommands(bot)
 
-	// Хранилище чатов с типами
 	chatsStore := make(map[int64]ChatInfo)
-	chatsStoreMutex := &sync.Mutex{}
+	var mu sync.Mutex
 
-	// Принудительно сканируем все чаты
-	log.Println("🔍 Сканирую все доступные чаты...")
-	forceGetAllChats(bot, chatsStore, chatsStoreMutex)
+	// ЖЕСТКИЙ ПЕРЕБОР ВСЕХ ЧАТОВ
+	log.Println("🔍 Жесткий поиск чатов...")
+	forceGetAllChats(bot, chatsStore, &mu)
 
 	updateConfig := tgbotapi.NewUpdate(0)
 	updateConfig.Timeout = 30
@@ -46,7 +45,7 @@ func main() {
 	go func() {
 		for update := range updates {
 			if update.CallbackQuery != nil {
-				go handleCallback(bot, update.CallbackQuery, chatsStore, chatsStoreMutex)
+				go handleCallback(bot, update.CallbackQuery, chatsStore, &mu)
 				continue
 			}
 
@@ -55,22 +54,21 @@ func main() {
 			}
 
 			chat := update.Message.Chat
-			chatsStoreMutex.Lock()
+			mu.Lock()
 			chatsStore[chat.ID] = ChatInfo{
 				ID:       chat.ID,
 				Title:    chat.Title,
 				Type:     getChatType(chat),
 				UserName: chat.UserName,
 			}
-			chatsStoreMutex.Unlock()
+			mu.Unlock()
 
-			go handleMessage(bot, update.Message, chatsStore, chatsStoreMutex)
+			go handleMessage(bot, update.Message, chatsStore, &mu)
 		}
 	}()
 
 	log.Printf("📊 Найдено чатов: %d", len(chatsStore))
 	log.Println("🚀 Бот запущен!")
-	log.Println("📌 Нажми Ctrl+C для остановки")
 
 	<-sigChan
 	log.Println("👋 Бот остановлен")
@@ -79,7 +77,7 @@ func main() {
 type ChatInfo struct {
 	ID       int64
 	Title    string
-	Type     string // private, group, supergroup, channel
+	Type     string
 	UserName string
 }
 
@@ -87,70 +85,89 @@ func getChatType(chat *tgbotapi.Chat) string {
 	if chat.IsChannel() {
 		return "📢 Канал"
 	}
-	if chat.IsGroup() {
-		return "👥 Группа"
-	}
 	if chat.IsSuperGroup() {
 		return "👥 Супергруппа"
+	}
+	if chat.IsGroup() {
+		return "👥 Группа"
 	}
 	return "👤 Личный"
 }
 
-func forceGetAllChats(bot *tgbotapi.BotAPI, chatsStore map[int64]ChatInfo, mutex *sync.Mutex) {
-	// Получаем все обновления
-	updates, err := bot.GetUpdates(tgbotapi.NewUpdate(0))
-	if err != nil {
-		log.Printf("❌ Ошибка получения обновлений: %v", err)
-		return
-	}
-
-	count := 0
-	for _, update := range updates {
-		mutex.Lock()
-		// Из сообщений
-		if update.Message != nil {
-			chat := update.Message.Chat
-			if chat.ID != 0 {
-				chatsStore[chat.ID] = ChatInfo{
-					ID:       chat.ID,
-					Title:    chat.Title,
-					Type:     getChatType(chat),
-					UserName: chat.UserName,
-				}
-				count++
-				log.Printf("✅ Найден %s: %d - %s", getChatType(chat), chat.ID, chat.Title)
-			}
+// ЖЕСТКИЙ ПЕРЕБОР
+func forceGetAllChats(bot *tgbotapi.BotAPI, chatsStore map[int64]ChatInfo, mu *sync.Mutex) {
+	// Перебираем все update_id от 0 до 1000000
+	for offset := 0; offset < 1000000; offset += 100 {
+		config := tgbotapi.NewUpdate(offset)
+		config.Limit = 100
+		updates, err := bot.GetUpdates(config)
+		if err != nil {
+			log.Printf("❌ Ошибка на offset %d: %v", offset, err)
+			break
 		}
 
-		// Из callback'ов
-		if update.CallbackQuery != nil && update.CallbackQuery.Message != nil {
-			chat := update.CallbackQuery.Message.Chat
-			if chat.ID != 0 {
-				chatsStore[chat.ID] = ChatInfo{
-					ID:       chat.ID,
-					Title:    chat.Title,
-					Type:     getChatType(chat),
-					UserName: chat.UserName,
-				}
-				count++
-				log.Printf("✅ Найден %s (callback): %d - %s", getChatType(chat), chat.ID, chat.Title)
-			}
+		if len(updates) == 0 {
+			break
 		}
-		mutex.Unlock()
+
+		for _, update := range updates {
+			mu.Lock()
+			// Из сообщений
+			if update.Message != nil && update.Message.Chat.ID != 0 {
+				chat := update.Message.Chat
+				if _, exists := chatsStore[chat.ID]; !exists {
+					chatsStore[chat.ID] = ChatInfo{
+						ID:       chat.ID,
+						Title:    chat.Title,
+						Type:     getChatType(chat),
+						UserName: chat.UserName,
+					}
+					log.Printf("✅ Найден: %s - %s", getChatType(chat), chat.Title)
+				}
+			}
+
+			// Из callback
+			if update.CallbackQuery != nil && update.CallbackQuery.Message != nil {
+				chat := update.CallbackQuery.Message.Chat
+				if _, exists := chatsStore[chat.ID]; !exists {
+					chatsStore[chat.ID] = ChatInfo{
+						ID:       chat.ID,
+						Title:    chat.Title,
+						Type:     getChatType(chat),
+						UserName: chat.UserName,
+					}
+					log.Printf("✅ Найден (callback): %s - %s", getChatType(chat), chat.Title)
+				}
+			}
+
+			// Из инлайн запросов
+			if update.InlineQuery != nil {
+				// инлайн запросы не дают chat_id
+			}
+			mu.Unlock()
+		}
+
+		// Обновляем offset
+		offset = updates[len(updates)-1].UpdateID
+
+		// Если обновлений меньше лимита - выходим
+		if len(updates) < 100 {
+			break
+		}
+
+		time.Sleep(100 * time.Millisecond)
 	}
 
-	if count == 0 {
-		log.Println("⚠️ Не найдено чатов. Убедись, что бот добавлен в группы/каналы")
-	}
+	log.Printf("✅ Сканирование завершено. Найдено чатов: %d", len(chatsStore))
 }
 
 func setCommands(bot *tgbotapi.BotAPI) {
 	commands := []tgbotapi.BotCommand{
 		{Command: "start", Description: "🏠 Главное меню"},
-		{Command: "ping", Description: "🏓 Проверка связи"},
-		{Command: "chats", Description: "📋 Список всех чатов"},
-		{Command: "refresh", Description: "🔄 Обновить список чатов"},
-		{Command: "broadcast", Description: "📢 Рассылка во все чаты"},
+		{Command: "ping", Description: "🏓 Проверка"},
+		{Command: "chats", Description: "📋 Список чатов"},
+		{Command: "refresh", Description: "🔄 Обновить чаты"},
+		{Command: "broadcast", Description: "📢 Рассылка"},
 		{Command: "help", Description: "📖 Помощь"},
 	}
 
@@ -162,7 +179,7 @@ func setCommands(bot *tgbotapi.BotAPI) {
 	}
 }
 
-func handleMessage(bot *tgbotapi.BotAPI, message *tgbotapi.Message, chatsStore map[int64]ChatInfo, mutex *sync.Mutex) {
+func handleMessage(bot *tgbotapi.BotAPI, message *tgbotapi.Message, chatsStore map[int64]ChatInfo, mu *sync.Mutex) {
 	log.Printf("📩 [%s] %s", message.From.UserName, message.Text)
 
 	switch message.Text {
@@ -174,9 +191,9 @@ func handleMessage(bot *tgbotapi.BotAPI, message *tgbotapi.Message, chatsStore m
 			"📖 *Команды:*\n\n"+
 				"/start - 🏠 Меню\n"+
 				"/ping - 🏓 Проверка\n"+
-				"/chats - 📋 Список чатов (личные/группы/каналы)\n"+
-				"/refresh - 🔄 Обновить список\n"+
-				"/broadcast [текст] - 📢 Рассылка во все чаты\n"+
+				"/chats - 📋 Список чатов\n"+
+				"/refresh - 🔄 Обновить чаты\n"+
+				"/broadcast [текст] - 📢 Рассылка\n"+
 				"/help - 📖 Помощь",
 		)
 		msg.ParseMode = "Markdown"
@@ -187,26 +204,24 @@ func handleMessage(bot *tgbotapi.BotAPI, message *tgbotapi.Message, chatsStore m
 		bot.Send(msg)
 
 	case "/chats":
-		showAllChats(bot, message.Chat.ID, chatsStore, mutex)
+		showAllChats(bot, message.Chat.ID, chatsStore, mu)
 
 	case "/refresh":
 		msg := tgbotapi.NewMessage(message.Chat.ID, "🔄 Обновляю список чатов...")
 		bot.Send(msg)
-		forceGetAllChats(bot, chatsStore, mutex)
-		showAllChats(bot, message.Chat.ID, chatsStore, mutex)
+		forceGetAllChats(bot, chatsStore, mu)
+		showAllChats(bot, message.Chat.ID, chatsStore, mu)
 
 	default:
 		if strings.HasPrefix(message.Text, "/broadcast") {
 			text := strings.TrimSpace(strings.TrimPrefix(message.Text, "/broadcast"))
 			if text == "" {
-				msg := tgbotapi.NewMessage(message.Chat.ID,
-					"❌ Напиши текст: `/broadcast Всем привет!`",
-				)
+				msg := tgbotapi.NewMessage(message.Chat.ID, "❌ Напиши текст: `/broadcast Всем привет!`")
 				msg.ParseMode = "Markdown"
 				bot.Send(msg)
 				return
 			}
-			go broadcastMessage(bot, message.Chat.ID, text, message.From.UserName, chatsStore, mutex)
+			go broadcastMessage(bot, message.Chat.ID, text, message.From.UserName, chatsStore, mu)
 		}
 	}
 }
@@ -233,7 +248,7 @@ func sendMainMenu(bot *tgbotapi.BotAPI, chatID int64) {
 	bot.Send(msg)
 }
 
-func handleCallback(bot *tgbotapi.BotAPI, callback *tgbotapi.CallbackQuery, chatsStore map[int64]ChatInfo, mutex *sync.Mutex) {
+func handleCallback(bot *tgbotapi.BotAPI, callback *tgbotapi.CallbackQuery, chatsStore map[int64]ChatInfo, mu *sync.Mutex) {
 	bot.Send(tgbotapi.NewCallback(callback.ID, ""))
 
 	chatID := callback.Message.Chat.ID
@@ -244,21 +259,20 @@ func handleCallback(bot *tgbotapi.BotAPI, callback *tgbotapi.CallbackQuery, chat
 
 	switch data {
 	case "status":
-		response = "✅ *Статус:*\n• Работает: ✅\n• Чатов: " + itoa(len(chatsStore)) + "\n• Время: " + time.Now().Format("15:04:05")
+		response = "✅ *Статус:*\n• Работает: ✅\n• Чатов: " + strconv.Itoa(len(chatsStore)) + "\n• Время: " + time.Now().Format("15:04:05")
 	case "info":
-		response = "📝 *Инфо:*\n• Бот: Telegram Bridge\n• Токен: ✅\n• Чатов: " + itoa(len(chatsStore))
+		response = "📝 *Инфо:*\n• Бот: Telegram Bridge\n• Токен: ✅\n• Чатов: " + strconv.Itoa(len(chatsStore))
 	case "time":
 		response = "🕐 " + time.Now().Format("02.01.2006 15:04:05")
 	case "refresh":
-		response = "🔄 Обновляю..."
-		bot.Send(tgbotapi.NewMessage(chatID, "🔄 Обновляю список чатов..."))
-		forceGetAllChats(bot, chatsStore, mutex)
-		showAllChats(bot, chatID, chatsStore, mutex)
+		bot.Send(tgbotapi.NewMessage(chatID, "🔄 Обновляю..."))
+		forceGetAllChats(bot, chatsStore, mu)
+		showAllChats(bot, chatID, chatsStore, mu)
 		return
 	case "broadcast_menu":
 		response = "📢 Рассылка: `/broadcast Текст`"
 	case "chats_list":
-		showAllChats(bot, chatID, chatsStore, mutex)
+		showAllChats(bot, chatID, chatsStore, mu)
 		return
 	case "back_to_menu":
 		sendMainMenu(bot, chatID)
@@ -279,15 +293,15 @@ func handleCallback(bot *tgbotapi.BotAPI, callback *tgbotapi.CallbackQuery, chat
 	bot.Send(edit)
 }
 
-func showAllChats(bot *tgbotapi.BotAPI, chatID int64, chatsStore map[int64]ChatInfo, mutex *sync.Mutex) {
-	mutex.Lock()
-	defer mutex.Unlock()
+func showAllChats(bot *tgbotapi.BotAPI, chatID int64, chatsStore map[int64]ChatInfo, mu *sync.Mutex) {
+	mu.Lock()
+	defer mu.Unlock()
 
 	if len(chatsStore) == 0 {
 		msg := tgbotapi.NewMessage(chatID,
-			"📭 *Нет сохраненных чатов*\n\n"+
+			"📭 *Нет чатов*\n\n"+
 				"1️⃣ Добавь бота в группу/канал\n"+
-				"2️⃣ Напиши что-нибудь боту\n"+
+				"2️⃣ Напиши боту что-нибудь\n"+
 				"3️⃣ Нажми /refresh",
 		)
 		msg.ParseMode = "Markdown"
@@ -295,7 +309,6 @@ func showAllChats(bot *tgbotapi.BotAPI, chatID int64, chatsStore map[int64]ChatI
 		return
 	}
 
-	// Сортируем по типу
 	var private, groups, channels []string
 
 	for _, info := range chatsStore {
@@ -308,12 +321,11 @@ func showAllChats(bot *tgbotapi.BotAPI, chatID int64, chatsStore map[int64]ChatI
 		}
 		line := "• `" + strconv.FormatInt(info.ID, 10) + "` - " + title
 
-		switch {
-		case strings.Contains(info.Type, "Канал"):
+		if strings.Contains(info.Type, "Канал") {
 			channels = append(channels, line)
-		case strings.Contains(info.Type, "Группа") || strings.Contains(info.Type, "Супер"):
+		} else if strings.Contains(info.Type, "Группа") || strings.Contains(info.Type, "Супер") {
 			groups = append(groups, line)
-		default:
+		} else {
 			private = append(private, line)
 		}
 	}
@@ -321,13 +333,17 @@ func showAllChats(bot *tgbotapi.BotAPI, chatID int64, chatsStore map[int64]ChatI
 	res := "📋 *Список чатов:*\n\n"
 
 	if len(private) > 0 {
-		res += "👤 *Личные (" + itoa(len(private)) + "):*\n" + strings.Join(private, "\n") + "\n\n"
+		res += "👤 *Личные (" + strconv.Itoa(len(private)) + "):*\n" + strings.Join(private, "\n") + "\n\n"
 	}
 	if len(groups) > 0 {
-		res += "👥 *Группы (" + itoa(len(groups)) + "):*\n" + strings.Join(groups, "\n") + "\n\n"
+		res += "👥 *Группы (" + strconv.Itoa(len(groups)) + "):*\n" + strings.Join(groups, "\n") + "\n\n"
 	}
 	if len(channels) > 0 {
-		res += "📢 *Каналы (" + itoa(len(channels)) + "):*\n" + strings.Join(channels, "\n") + "\n"
+		res += "📢 *Каналы (" + strconv.Itoa(len(channels)) + "):*\n" + strings.Join(channels, "\n") + "\n"
+	}
+
+	if len(res) > 4000 {
+		res = res[:4000] + "\n\n... (обрезано)"
 	}
 
 	msg := tgbotapi.NewMessage(chatID, res)
@@ -335,9 +351,9 @@ func showAllChats(bot *tgbotapi.BotAPI, chatID int64, chatsStore map[int64]ChatI
 	bot.Send(msg)
 }
 
-func broadcastMessage(bot *tgbotapi.BotAPI, senderChatID int64, text string, senderName string, chatsStore map[int64]ChatInfo, mutex *sync.Mutex) {
-	mutex.Lock()
-	defer mutex.Unlock()
+func broadcastMessage(bot *tgbotapi.BotAPI, senderChatID int64, text string, senderName string, chatsStore map[int64]ChatInfo, mu *sync.Mutex) {
+	mu.Lock()
+	defer mu.Unlock()
 
 	log.Printf("📢 Рассылка от %s: %s", senderName, text)
 
@@ -346,9 +362,7 @@ func broadcastMessage(bot *tgbotapi.BotAPI, senderChatID int64, text string, sen
 		return
 	}
 
-	bot.Send(tgbotapi.NewMessage(senderChatID,
-		"📢 Начинаю рассылку...\n📊 Чатов: "+itoa(len(chatsStore)),
-	))
+	bot.Send(tgbotapi.NewMessage(senderChatID, "📢 Начинаю рассылку...\n📊 Чатов: "+strconv.Itoa(len(chatsStore))))
 
 	success := 0
 	fail := 0
@@ -374,11 +388,7 @@ func broadcastMessage(bot *tgbotapi.BotAPI, senderChatID int64, text string, sen
 
 	bot.Send(tgbotapi.NewMessage(senderChatID,
 		"✅ *Рассылка завершена!*\n\n"+
-			"✅ Успешно: "+itoa(success)+"\n"+
-			"❌ Ошибок: "+itoa(fail),
+			"✅ Успешно: "+strconv.Itoa(success)+"\n"+
+			"❌ Ошибок: "+strconv.Itoa(fail),
 	))
-}
-
-func itoa(i int) string {
-	return strconv.Itoa(i)
 }
