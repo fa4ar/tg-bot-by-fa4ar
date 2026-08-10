@@ -29,7 +29,6 @@ func main() {
 	chatsStore := make(map[int64]ChatInfo)
 	var mu sync.Mutex
 
-	// ЖЕСТКИЙ ПЕРЕБОР ВСЕХ ЧАТОВ
 	log.Println("🔍 Жесткий поиск чатов...")
 	forceGetAllChats(bot, chatsStore, &mu)
 
@@ -94,9 +93,7 @@ func getChatType(chat *tgbotapi.Chat) string {
 	return "👤 Личный"
 }
 
-// ЖЕСТКИЙ ПЕРЕБОР
 func forceGetAllChats(bot *tgbotapi.BotAPI, chatsStore map[int64]ChatInfo, mu *sync.Mutex) {
-	// Перебираем все update_id от 0 до 1000000
 	for offset := 0; offset < 1000000; offset += 100 {
 		config := tgbotapi.NewUpdate(offset)
 		config.Limit = 100
@@ -112,7 +109,6 @@ func forceGetAllChats(bot *tgbotapi.BotAPI, chatsStore map[int64]ChatInfo, mu *s
 
 		for _, update := range updates {
 			mu.Lock()
-			// Из сообщений
 			if update.Message != nil && update.Message.Chat.ID != 0 {
 				chat := update.Message.Chat
 				if _, exists := chatsStore[chat.ID]; !exists {
@@ -126,7 +122,6 @@ func forceGetAllChats(bot *tgbotapi.BotAPI, chatsStore map[int64]ChatInfo, mu *s
 				}
 			}
 
-			// Из callback
 			if update.CallbackQuery != nil && update.CallbackQuery.Message != nil {
 				chat := update.CallbackQuery.Message.Chat
 				if _, exists := chatsStore[chat.ID]; !exists {
@@ -139,18 +134,10 @@ func forceGetAllChats(bot *tgbotapi.BotAPI, chatsStore map[int64]ChatInfo, mu *s
 					log.Printf("✅ Найден (callback): %s - %s", getChatType(chat), chat.Title)
 				}
 			}
-
-			// Из инлайн запросов
-			if update.InlineQuery != nil {
-				// инлайн запросы не дают chat_id
-			}
 			mu.Unlock()
 		}
 
-		// Обновляем offset
 		offset = updates[len(updates)-1].UpdateID
-
-		// Если обновлений меньше лимита - выходим
 		if len(updates) < 100 {
 			break
 		}
@@ -366,7 +353,9 @@ func broadcastMessage(bot *tgbotapi.BotAPI, senderChatID int64, text string, sen
 
 	success := 0
 	fail := 0
-	msgText := "📢 *Рассылка*\n\n" + text + "\n\n👤 От: " + senderName
+
+	// Отправляем как обычный текст, без Markdown
+	msgText := "📢 Рассылка\n\n" + text + "\n\nОт: " + senderName
 
 	for chatID, info := range chatsStore {
 		if chatID == senderChatID {
@@ -374,7 +363,7 @@ func broadcastMessage(bot *tgbotapi.BotAPI, senderChatID int64, text string, sen
 		}
 
 		msg := tgbotapi.NewMessage(chatID, msgText)
-		msg.ParseMode = "Markdown"
+		// НЕ ставим ParseMode - отправляем как plain text
 
 		if _, err := bot.Send(msg); err != nil {
 			fail++
@@ -387,7 +376,7 @@ func broadcastMessage(bot *tgbotapi.BotAPI, senderChatID int64, text string, sen
 	}
 
 	bot.Send(tgbotapi.NewMessage(senderChatID,
-		"✅ *Рассылка завершена!*\n\n"+
+		"✅ Рассылка завершена!\n\n"+
 			"✅ Успешно: "+strconv.Itoa(success)+"\n"+
 			"❌ Ошибок: "+strconv.Itoa(fail),
 	))
