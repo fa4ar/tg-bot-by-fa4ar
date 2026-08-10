@@ -1,0 +1,146 @@
+{
+  "factions": [
+    {
+      "name": "Армия РФ",
+      "color": "#4caf50",
+      "active": true,
+      "squads": [
+        {
+          "name": "Кремль-92",
+          "size": 2,
+          "active": true,
+          "roles": [{"name": "Командир"}, {"name": "Заместитель"}]
+        },
+        {
+          "name": "Гром-20",
+          "size": 10,
+          "active": true,
+          "roles": [{"name": "Командир"}, {"name": "Зам. Командира"}, {"name": "Пулеметчик"}, {"name": "Помощник Пулеметчика"}, {"name": "Гранатометчик"}, {"name": "Помощник Гранатометчика"}, {"name": "Медик"}, {"name": "Стрелок"}, {"name": "Стрелок"}, {"name": "Стрелок"}]
+        },
+        {
+          "name": "Молния-54",
+          "size": 10,
+          "active": true,
+          "roles": [{"name": "Командир"}, {"name": "Зам. Командира"}, {"name": "Пулеметчик"}, {"name": "Помощник Пулеметчика"}, {"name": "Гранатометчик"}, {"name": "Помощник Гранатометчика"}, {"name": "Медик"}, {"name": "Стрелок"}, {"name": "Стрелок"}, {"name": "Стрелок"}]
+        },
+        {
+          "name": "Велес-10",
+          "size": 2,
+          "active": true,
+          "roles": [{"name": "Снайперская Пара \"Велес-10\""}, {"name": "Корректировщик"}]
+        },
+        {
+          "name": "Молот-15",
+          "size": 4,
+          "active": true,
+          "roles": [{"name": "Командир"}, {"name": "Наводчик"}, {"name": "Наводчик"}, {"name": "Заряжающий"}]
+        },
+        {
+          "name": "Фугас-29",
+          "size": 4,
+          "active": true,
+          "roles": [{"name": "Командир"}, {"name": "Сапер"}, {"name": "Сапер"}, {"name": "Стрелок"}]
+        },
+        {
+          "name": "Лес-37",
+          "size": 4,
+          "active": true,
+          "roles": [{"name": "Командир"}, {"name": "Радист"}, {"name": "Разведчик"}, {"name": "Разведчик"}]
+        }
+      ]
+    },
+    {
+      "name": "Армия США",
+      "color": "#2196f3",
+      "active": true,
+      "squads": [
+        {
+          "name": "Вашингтон",
+          "size": 2,
+          "active": true,
+          "roles": [{"name": "Командир"}, {"name": "Заместитель"}]
+        },
+        {
+          "name": "Альфа",
+          "size": 12,
+          "active": true,
+          "roles": [{"name": "Командир"}, {"name": "Зам. Командира"}, {"name": "Пулеметчик"}, {"name": "Помощник Пулеметчика"}, {"name": "Гранатометчик"}, {"name": "Помощник Гранатометчика"}, {"name": "Пулеметчик"}, {"name": "Помощник Пулеметчика"}, {"name": "Медик"}, {"name": "Стрелок"}, {"name": "Стрелок"}, {"name": "Стрелок"}]
+        },
+        {
+          "name": "Браво",
+          "size": 12,
+          "active": true,
+          "roles": [{"name": "Командир"}, {"name": "Зам. Командира"}, {"name": "Пулеметчик"}, {"name": "Помощник Пулеметчика"}, {"name": "Гранатометчик"}, {"name": "Помощник Гранатометчика"}, {"name": "Медик"}, {"name": "Стрелок"}, {"name": "Стрелок"}, {"name": "Стрелок"}, {"name": "Стрелок"}, {"name": "Стрелок"}]
+        },
+        {
+          "name": "Чарли",
+          "size": 12,
+          "active": true,
+          "roles": [{"name": "Командир"}, {"name": "Зам. Командира"}, {"name": "Пулеметчик"}, {"name": "Помощник Пулеметчика"}, {"name": "Гранатометчик"}, {"name": "Помощник Гранатометчика"}, {"name": "Пулеметчик"}, {"name": "Помощник Пулеметчика"}, {"name": "Медик"}, {"name": "Стрелок"}, {"name": "Стрелок"}, {"name": "Стрелок"}]
+        },
+        {
+          "name": "Архангел",
+          "size": 4,
+          "active": true,
+          "roles": [{"name": "Снайпер"}, {"name": "Снайпер"}, {"name": "Корректировщик"}, {"name": "Корректировщик"}]
+        },
+        {
+          "name": "Пилоты",
+          "size": 4,
+          "active": true,
+          "roles": [{"name": "Пилот"}, {"name": "Второй пилот"}, {"name": "Пилот"}, {"name": "Второй пилот"}]
+        },
+        {
+          "name": "Нэшвил",
+          "size": 3,
+          "active": true,
+          "roles": [{"name": "Командир"}, {"name": "Наводчик"}, {"name": "Мехвод"}]
+        }
+      ]
+    },
+    {
+      "name": "Сирийская оппозиция",
+      "color": "#ff9800",
+      "active": true,
+      "squads": [
+        {
+          "name": "Цикл-12",
+          "size": 6,
+          "active": true,
+          "roles": [{"name": "Командир"}, {"name": "Пулеметчик"}, {"name": "Гранатометчик"}, {"name": "Стрелок"}, {"name": "Медик"}, {"name": "Стрелок"}]
+        },
+        {
+          "name": "Снайперская Пара",
+          "size": 2,
+          "active": true,
+          "roles": [{"name": "Снайпер"}, {"name": "Корректировщик"}]
+        },
+        {
+          "name": "Буран-44",
+          "size": 9,
+          "active": true,
+          "roles": [{"name": "Командир"}, {"name": "Наводчик"}, {"name": "Мехвод"}, {"name": "Командир"}, {"name": "Наводчик"}, {"name": "Мехвод"}, {"name": "Командир"}, {"name": "Наводчик"}, {"name": "Мехвод"}]
+        }
+      ]
+    }
+  ],
+  "layouts": {
+    "Кремль-92": {"faction": "Армия РФ", "role_col": "A", "arma_col": "B", "discord_col": "C", "start_row": 24, "end_row": 25},
+    "Гром-20": {"faction": "Армия РФ", "role_col": "A", "arma_col": "B", "discord_col": "C", "start_row": 30, "end_row": 41},
+    "Молния-54": {"faction": "Армия РФ", "role_col": "A", "arma_col": "B", "discord_col": "C", "start_row": 46, "end_row": 57},
+    "Велес-10": {"faction": "Армия РФ", "role_col": "A", "arma_col": "B", "discord_col": "C", "start_row": 62, "end_row": 63},
+    "Молот-15": {"faction": "Армия РФ", "role_col": "A", "arma_col": "B", "discord_col": "C", "start_row": 68, "end_row": 71},
+    "Фугас-29": {"faction": "Армия РФ", "role_col": "A", "arma_col": "B", "discord_col": "C", "start_row": 77, "end_row": 80},
+    "Лес-37": {"faction": "Армия РФ", "role_col": "A", "arma_col": "B", "discord_col": "C", "start_row": 85, "end_row": 88},
+    "Вашингтон": {"faction": "Армия США", "role_col": "H", "arma_col": "I", "discord_col": "J", "start_row": 24, "end_row": 25},
+    "Альфа": {"faction": "Армия США", "role_col": "H", "arma_col": "I", "discord_col": "J", "start_row": 30, "end_row": 41},
+    "Браво": {"faction": "Армия США", "role_col": "H", "arma_col": "I", "discord_col": "J", "start_row": 46, "end_row": 57},
+    "Чарли": {"faction": "Армия США", "role_col": "H", "arma_col": "I", "discord_col": "J", "start_row": 62, "end_row": 73},
+    "Архангел": {"faction": "Армия США", "role_col": "H", "arma_col": "I", "discord_col": "J", "start_row": 77, "end_row": 80},
+    "Пилоты": {"faction": "Армия США", "role_col": "H", "arma_col": "I", "discord_col": "J", "start_row": 85, "end_row": 88},
+    "Нэшвил": {"faction": "Армия США", "role_col": "H", "arma_col": "I", "discord_col": "J", "start_row": 93, "end_row": 94},
+    "Цикл-12": {"faction": "Сирийская оппозиция", "role_col": "A", "arma_col": "B", "discord_col": "C", "start_row": 99, "end_row": 104},
+    "Снайперская Пара": {"faction": "Сирийская оппозиция", "role_col": "A", "arma_col": "B", "discord_col": "C", "start_row": 109, "end_row": 110},
+    "Буран-44": {"faction": "Сирийская оппозиция", "role_col": "A", "arma_col": "B", "discord_col": "C", "start_row": 116, "end_row": 124}
+  }
+}
