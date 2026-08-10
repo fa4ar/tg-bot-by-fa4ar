@@ -208,7 +208,7 @@ func handleMessage(bot *tgbotapi.BotAPI, message *tgbotapi.Message, chatsStore m
 				bot.Send(msg)
 				return
 			}
-			go broadcastMessage(bot, message.Chat.ID, text, message.From.UserName, chatsStore, mu)
+			go broadcastMessage(bot, message.Chat.ID, text, chatsStore, mu)
 		}
 	}
 }
@@ -338,11 +338,11 @@ func showAllChats(bot *tgbotapi.BotAPI, chatID int64, chatsStore map[int64]ChatI
 	bot.Send(msg)
 }
 
-func broadcastMessage(bot *tgbotapi.BotAPI, senderChatID int64, text string, senderName string, chatsStore map[int64]ChatInfo, mu *sync.Mutex) {
+func broadcastMessage(bot *tgbotapi.BotAPI, senderChatID int64, text string, chatsStore map[int64]ChatInfo, mu *sync.Mutex) {
 	mu.Lock()
 	defer mu.Unlock()
 
-	log.Printf("📢 Рассылка от %s: %s", senderName, text)
+	log.Printf("📢 Рассылка: %s", text)
 
 	if len(chatsStore) == 0 {
 		bot.Send(tgbotapi.NewMessage(senderChatID, "❌ Нет чатов для рассылки"))
@@ -354,8 +354,7 @@ func broadcastMessage(bot *tgbotapi.BotAPI, senderChatID int64, text string, sen
 	success := 0
 	fail := 0
 
-	// Отправляем как обычный текст, без Markdown
-	msgText := "📢 Рассылка\n\n" + text + "\n\nОт: " + senderName
+	msgText := text
 
 	for chatID, info := range chatsStore {
 		if chatID == senderChatID {
@@ -363,7 +362,6 @@ func broadcastMessage(bot *tgbotapi.BotAPI, senderChatID int64, text string, sen
 		}
 
 		msg := tgbotapi.NewMessage(chatID, msgText)
-		// НЕ ставим ParseMode - отправляем как plain text
 
 		if _, err := bot.Send(msg); err != nil {
 			fail++
