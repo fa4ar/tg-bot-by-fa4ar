@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"os"
 	"os/signal"
@@ -12,6 +13,8 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
+
+const SAVE_FILE = "chats.json"
 
 func main() {
 	token := "8949321510:AAHzo0wTfWnP50SD7LexgUHCuhky1Ey7pNU"
@@ -29,8 +32,15 @@ func main() {
 	chatsStore := make(map[int64]ChatInfo)
 	var mu sync.Mutex
 
+	// ЗАГРУЖАЕМ СОХРАНЕННЫЕ ЧАТЫ
+	loadChats(&chatsStore, &mu)
+	log.Printf("📂 Загружено чатов из файла: %d", len(chatsStore))
+
 	log.Println("🔍 Жесткий поиск чатов...")
 	forceGetAllChats(bot, chatsStore, &mu)
+
+	// СОХРАНЯЕМ ЧАТЫ
+	saveChats(chatsStore, &mu)
 
 	updateConfig := tgbotapi.NewUpdate(0)
 	updateConfig.Timeout = 30
@@ -62,22 +72,67 @@ func main() {
 			}
 			mu.Unlock()
 
+			// СОХРАНЯЕМ ПРИ КАЖДОМ НОВОМ ЧАТЕ
+			saveChats(chatsStore, &mu)
+
 			go handleMessage(bot, update.Message, chatsStore, &mu)
 		}
 	}()
 
-	log.Printf("📊 Найдено чатов: %d", len(chatsStore))
+	log.Printf("📊 Всего чатов: %d", len(chatsStore))
 	log.Println("🚀 Бот запущен!")
 
 	<-sigChan
+	// СОХРАНЯЕМ ПЕРЕД ВЫХОДОМ
+	saveChats(chatsStore, &mu)
 	log.Println("👋 Бот остановлен")
 }
 
+// СОХРАНЕНИЕ В ФАЙЛ
+func saveChats(chatsStore map[int64]ChatInfo, mu *sync.Mutex) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	data, err := json.MarshalIndent(chatsStore, "", "  ")
+	if err != nil {
+		log.Printf("❌ Ошибка сохранения: %v", err)
+		return
+	}
+
+	if err := os.WriteFile(SAVE_FILE, data, 0644); err != nil {
+		log.Printf("❌ Ошибка записи файла: %v", err)
+		return
+	}
+	log.Printf("💾 Сохранено чатов: %d", len(chatsStore))
+}
+
+// ЗАГРУЗКА ИЗ ФАЙЛА
+func loadChats(chatsStore *map[int64]ChatInfo, mu *sync.Mutex) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	data, err := os.ReadFile(SAVE_FILE)
+	if err != nil {
+		if os.IsNotExist(err) {
+			log.Println("📂 Файл с чатами не найден, создаю новый")
+			return
+		}
+		log.Printf("❌ Ошибка чтения файла: %v", err)
+		return
+	}
+
+	if err := json.Unmarshal(data, chatsStore); err != nil {
+		log.Printf("❌ Ошибка парсинга: %v", err)
+		return
+	}
+	log.Printf("📂 Загружено чатов: %d", len(*chatsStore))
+}
+
 type ChatInfo struct {
-	ID       int64
-	Title    string
-	Type     string
-	UserName string
+	ID       int64  `json:"id"`
+	Title    string `json:"title"`
+	Type     string `json:"type"`
+	UserName string `json:"user_name"`
 }
 
 func getChatType(chat *tgbotapi.Chat) string {
@@ -99,7 +154,6 @@ func forceGetAllChats(bot *tgbotapi.BotAPI, chatsStore map[int64]ChatInfo, mu *s
 		config.Limit = 100
 		updates, err := bot.GetUpdates(config)
 		if err != nil {
-			log.Printf("❌ Ошибка на offset %d: %v", offset, err)
 			break
 		}
 
@@ -197,6 +251,7 @@ func handleMessage(bot *tgbotapi.BotAPI, message *tgbotapi.Message, chatsStore m
 		msg := tgbotapi.NewMessage(message.Chat.ID, "🔄 Обновляю список чатов...")
 		bot.Send(msg)
 		forceGetAllChats(bot, chatsStore, mu)
+		saveChats(chatsStore, mu)
 		showAllChats(bot, message.Chat.ID, chatsStore, mu)
 
 	default:
@@ -254,6 +309,7 @@ func handleCallback(bot *tgbotapi.BotAPI, callback *tgbotapi.CallbackQuery, chat
 	case "refresh":
 		bot.Send(tgbotapi.NewMessage(chatID, "🔄 Обновляю..."))
 		forceGetAllChats(bot, chatsStore, mu)
+		saveChats(chatsStore, mu)
 		showAllChats(bot, chatID, chatsStore, mu)
 		return
 	case "broadcast_menu":
@@ -354,14 +410,12 @@ func broadcastMessage(bot *tgbotapi.BotAPI, senderChatID int64, text string, cha
 	success := 0
 	fail := 0
 
-	msgText := text
-
 	for chatID, info := range chatsStore {
 		if chatID == senderChatID {
 			continue
 		}
 
-		msg := tgbotapi.NewMessage(chatID, msgText)
+		msg := tgbotapi.NewMessage(chatID, text)
 
 		if _, err := bot.Send(msg); err != nil {
 			fail++
